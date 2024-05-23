@@ -1,0 +1,86 @@
+#include <Arduino.h>
+#if defined(ESP32)
+#include <WiFi.h>
+#include <FirebaseESP32.h>
+#elif defined(ESP8266)
+#include <ESP8266WiFi.h>
+#include <FirebaseESP8266.h>
+#elif defined(ARDUINO_RASPBERRY_PI_PICO_W)
+#include <WiFi.h>
+#include <FirebaseESP8266.h>
+#endif
+#include <addons/TokenHelper.h>
+#include <addons/RTDBHelper.h>
+#include <Keypad.h>
+
+#define Password_Length 4
+char Data[Password_Length + 1] = {0}; //all locations contain 0
+const int lock = 13;
+byte data_count = 0;
+char customKey;
+char myPassword[] = "1234";  //pre-stored password
+
+const byte ROWS = 4;
+const byte COLS = 4;
+
+char hexaKeys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte rowPins[ROWS] = {13, 12, 14, 27}; 
+byte colPins[COLS] = {26, 25, 33, 32}; 
+
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
+
+#define WIFI_SSID "Unknown"
+#define WIFI_PASSWORD "43214321"
+#define API_KEY "AIzaSyDCQZOD3P2uDuE7CGYWR2vwsLj9VDh710M"
+#define DATABASE_URL "https://project-324f8-default-rtdb.firebaseio.com"
+#define USER_EMAIL "project@gmail.com"
+#define USER_PASSWORD "123456789"
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+unsigned long sendDataPrevMillis = 0;
+unsigned long count = 0;
+void setup()
+{
+  Serial.begin(115200);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print(".");
+    delay(300);
+  }
+  Serial.println();
+  Serial.print("Connected with IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+  Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
+  config.api_key = API_KEY;
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+  config.database_url = DATABASE_URL;
+  config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+  Firebase.setDoubleDigits(5);
+  pinMode(D1, OUTPUT);
+}
+void loop()
+{
+  Serial.printf("Get string... %s\n", Firebase.getString(fbdo, F("/finger2/data")) ? fbdo.to<const char *>() : fbdo.errorReason().c_str());
+  String a=Firebase.getString(fbdo, F("/finger2/data")) ? fbdo.to<const char *>() : fbdo.errorReason().c_str();
+  int y=a.toInt();
+  if(y==1)
+  {    
+    digitalWrite(D1, HIGH);
+    Serial.printf("Set string... %s\n", Firebase.setString(fbdo, F("/finger2/data"), 2) ? "ok" : fbdo.errorReason().c_str());
+    delay(1500);
+    digitalWrite(D1, LOW);  
+    delay(1500);
+  }
+}
